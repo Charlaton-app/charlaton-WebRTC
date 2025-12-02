@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import "dotenv/config";
 import { JWTUser } from "./types";
 import { db } from "./config/firebase";
+import { send } from "process";
 
 
 // ===== Initialize Express App =====
@@ -286,8 +287,9 @@ io.on("connection",(socket) => {
 
     // ===== WebRTC SIGNALS =====
 
-    socket.on("webrtc_offer", async ({ roomId, targetUserId, sdp }) => {
+    socket.on("webrtc_offer", async ({ senderId, sdp }) => {
         // Buscar socket del target en la sala
+        const roomId = socket.data.roomId;
         const room = io.sockets.adapter.rooms.get(roomId);
 
         if (socket.data.roomId !== roomId) {
@@ -296,20 +298,16 @@ io.on("connection",(socket) => {
           }
 
         if (!room) return;
-        for (const sockId of room) {
-          const s = io.sockets.sockets.get(sockId);
-          if (s && s.data.userId === targetUserId) {
-            s.emit("webrtc_offer", {
-              senderId: socket.data.userId,
-              sdp,
-            });
-            break;
-          }
-        }
+
+        socket.to(roomId).emit("webrtc_offer", {
+          senderId: senderId,
+          sdp,
+        });
     });
     
       // Cuando alguien envía una respuesta WebRTC
-    socket.on("webrtc_answer", async ({ roomId, targetUserId, sdp }) => {
+    socket.on("webrtc_answer", async ({ senderId, sdp }) => {
+        const roomId = socket.data.roomId;
         const room = io.sockets.adapter.rooms.get(roomId);
         if (!room) return;
 
@@ -318,22 +316,16 @@ io.on("connection",(socket) => {
             return;
           }
     
-        for (const sockId of room) {
-          const s = io.sockets.sockets.get(sockId);
-    
-          if (s && s.data.userId === targetUserId) {
-            s.emit("webrtc_answer", {
-              senderId: socket.data.userId,
-              sdp,
-            });
-            break;
-          }
-        }
+        socket.to(roomId).emit("webrtc_answer", {
+          senderId: senderId,
+          sdp,
+        });
     });
     
     
       // Cuando alguien envia sus ICE candidates
-    socket.on("webrtc_ice_candidate", async ({ roomId, targetUserId, candidate }) => {
+    socket.on("webrtc_ice_candidate", async ({ senderId, candidate }) => {
+        const roomId = socket.data.roomId;
         const room = io.sockets.adapter.rooms.get(roomId);
         if (!room) return;
 
@@ -342,17 +334,10 @@ io.on("connection",(socket) => {
             return;
           }
     
-        for (const sockId of room) {
-          const s = io.sockets.sockets.get(sockId);
-    
-          if (s && s.data.userId === targetUserId) {
-            s.emit("webrtc_ice_candidate", {
-              senderId: socket.data.userId,
-              candidate,
-            });
-            break;
-          }
-        }
+        socket.to(roomId).emit("ice_candidate", {
+          senderId: senderId,
+          candidate,
+        });
     });
 
     // ========== DISCONNECT ==========
