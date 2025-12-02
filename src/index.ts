@@ -366,3 +366,13 @@ io.on("connection",(socket) => {
 
 
 });
+
+// ===== Start Server =====
+httpServer.listen(PORT, () => {
+    console.log("=".repeat(70));
+    console.log(`[SERVER] 🚀 Charlaton WebRTC Microservice running on port ${PORT}`);
+    console.log(`[CORS] 🌐 Allowed origins: ${allowedOrigins.join(", ")}`);
+    console.log(`[FIREBASE] 🔥 Admin SDK initialized`);
+    console.log(`[AUTH] 🔐 JWT authentication enabled`);
+    console.log("=".repeat(70));
+});
