@@ -258,7 +258,11 @@ io.on("connection", (socket) => {
       console.log(
         `[ROOM] 👤 User ${user.email} (${socket.data.userId}) attempting to join room ${roomId} in WebRTC server`
       );
-      console.log(`[ROOM] 🆔 Socket ID: ${socket.id}, Current roomId: ${socket.data.roomId || 'none'}`);
+      console.log(
+        `[ROOM] 🆔 Socket ID: ${socket.id}, Current roomId: ${
+          socket.data.roomId || "none"
+        }`
+      );
 
       if (!roomId) {
         console.error(`[ROOM] ❌ Invalid room ID from ${user.email}`);
@@ -284,7 +288,9 @@ io.on("connection", (socket) => {
       socket.data.roomId = roomId;
 
       if (!success) {
-        console.error(`[ROOM] ❌ Join rejected: success=false from ${user.email}`);
+        console.error(
+          `[ROOM] ❌ Join rejected: success=false from ${user.email}`
+        );
         socket.emit("join_room_error", {
           success: false,
           message: "invalid",
@@ -294,7 +300,9 @@ io.on("connection", (socket) => {
       }
 
       socket.join(roomId);
-      console.log(`[ROOM] ✅ User ${user.email} joined WebRTC room ${roomId} successfully`);
+      console.log(
+        `[ROOM] ✅ User ${user.email} joined WebRTC room ${roomId} successfully`
+      );
 
       socket.emit("join_room_success", {
         user: socket.data.user,
@@ -302,10 +310,10 @@ io.on("connection", (socket) => {
         success: true,
       });
       console.log(`[ROOM] 📤 Emitted join_room_success to ${user.email}`);
-      
+
       socket.to(roomId).emit("user_joined", user);
       console.log(`[ROOM] 📢 Broadcast user_joined to room ${roomId}`);
-      
+
       await emitUsers(roomId);
       console.log(`[ROOM] 👥 Emitted usersOnline for room ${roomId}`);
     } catch (error) {
@@ -322,7 +330,9 @@ io.on("connection", (socket) => {
   // ===== WebRTC SIGNALS =====
 
   socket.on("webrtc_offer", async ({ roomId, targetUserId, sdp }) => {
-    console.log(`[WEBRTC] 📡 Offer from ${socket.data.userId} to ${targetUserId} in room ${roomId}`);
+    console.log(
+      `[WEBRTC] 📡 Offer from ${socket.data.userId} to ${targetUserId} in room ${roomId}`
+    );
     // Buscar socket del target en la sala
     const room = io.sockets.adapter.rooms.get(roomId);
 
@@ -354,7 +364,9 @@ io.on("connection", (socket) => {
 
   // Cuando alguien envía una respuesta WebRTC
   socket.on("webrtc_answer", async ({ roomId, targetUserId, sdp }) => {
-    console.log(`[WEBRTC] 📡 Answer from ${socket.data.userId} to ${targetUserId} in room ${roomId}`);
+    console.log(
+      `[WEBRTC] 📡 Answer from ${socket.data.userId} to ${targetUserId} in room ${roomId}`
+    );
     const room = io.sockets.adapter.rooms.get(roomId);
     if (!room) {
       console.error(`[WEBRTC] ❌ Room ${roomId} not found for answer`);
@@ -362,7 +374,9 @@ io.on("connection", (socket) => {
     }
 
     if (socket.data.roomId !== roomId) {
-      console.error(`[WEBRTC] ❌ Answer rejected: sender not in room ${roomId}`);
+      console.error(
+        `[WEBRTC] ❌ Answer rejected: sender not in room ${roomId}`
+      );
       socket.emit("webrtc_error", {
         message: "Not in this room",
         success: false,
@@ -388,7 +402,9 @@ io.on("connection", (socket) => {
   socket.on(
     "webrtc_ice_candidate",
     async ({ roomId, targetUserId, candidate }) => {
-      console.log(`[WEBRTC] 🧊 ICE candidate from ${socket.data.userId} to ${targetUserId} in room ${roomId}`);
+      console.log(
+        `[WEBRTC] 🧊 ICE candidate from ${socket.data.userId} to ${targetUserId} in room ${roomId}`
+      );
       const room = io.sockets.adapter.rooms.get(roomId);
       if (!room) {
         console.error(`[WEBRTC] ❌ Room ${roomId} not found for ICE candidate`);
@@ -422,10 +438,16 @@ io.on("connection", (socket) => {
   // ========== DISCONNECT ==========
   socket.on("disconnect", async () => {
     const roomId = socket.data.roomId;
-    console.log(`[DISCONNECT] 👋 User ${user.email} (${socket.id}) disconnected from room ${roomId || 'none'}`);
+    console.log(
+      `[DISCONNECT] 👋 User ${user.email} (${
+        socket.id
+      }) disconnected from room ${roomId || "none"}`
+    );
     if (roomId) {
       socket.to(roomId).emit("user_left", user);
-      console.log(`[DISCONNECT] 📢 Broadcast user_left for ${user.email} in room ${roomId}`);
+      console.log(
+        `[DISCONNECT] 📢 Broadcast user_left for ${user.email} in room ${roomId}`
+      );
       await emitUsers(roomId);
       console.log(`[DISCONNECT] 👥 Updated usersOnline for room ${roomId}`);
     }
@@ -439,7 +461,9 @@ io.on("connection", (socket) => {
   socket.on("end_room", async () => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
-    console.log(`[ROOM] 🔚 (WebRTC) Ending room ${roomId} by ${socket.data.userId}`);
+    console.log(
+      `[ROOM] 🔚 (WebRTC) Ending room ${roomId} by ${socket.data.userId}`
+    );
     io.to(roomId).emit("room_ended", {
       success: true,
       roomId,
