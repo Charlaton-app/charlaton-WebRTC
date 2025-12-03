@@ -288,16 +288,18 @@ io.on("connection",(socket) => {
     // ===== WebRTC SIGNALS =====
 
     socket.on("webrtc_offer", async ({ senderId, sdp }) => {
-        // Buscar socket del target en la sala
         const roomId = socket.data.roomId;
-        const room = io.sockets.adapter.rooms.get(roomId);
-
-        if (socket.data.roomId !== roomId) {
-            socket.emit("webrtc_error", { message: "Not in this room", success: false });
+        
+        if (!roomId) {
+            socket.emit("webrtc_error", { message: "Not in any room", success: false });
             return;
-          }
+        }
 
-        if (!room) return;
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (!room) {
+            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+            return;
+        }
 
         socket.to(roomId).emit("webrtc_offer", {
           senderId: senderId,
@@ -308,13 +310,17 @@ io.on("connection",(socket) => {
       // Cuando alguien envía una respuesta WebRTC
     socket.on("webrtc_answer", async ({ senderId, sdp }) => {
         const roomId = socket.data.roomId;
-        const room = io.sockets.adapter.rooms.get(roomId);
-        if (!room) return;
-
-        if (socket.data.roomId !== roomId) {
-            socket.emit("webrtc_error", { message: "Not in this room", success: false });
+        
+        if (!roomId) {
+            socket.emit("webrtc_error", { message: "Not in any room", success: false });
             return;
-          }
+        }
+
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (!room) {
+            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+            return;
+        }
     
         socket.to(roomId).emit("webrtc_answer", {
           senderId: senderId,
@@ -326,13 +332,17 @@ io.on("connection",(socket) => {
       // Cuando alguien envia sus ICE candidates
     socket.on("webrtc_ice_candidate", async ({ senderId, candidate }) => {
         const roomId = socket.data.roomId;
-        const room = io.sockets.adapter.rooms.get(roomId);
-        if (!room) return;
-
-        if (socket.data.roomId !== roomId) {
-            socket.emit("webrtc_error", { message: "Not in this room", success: false });
+        
+        if (!roomId) {
+            socket.emit("webrtc_error", { message: "Not in any room", success: false });
             return;
-          }
+        }
+
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (!room) {
+            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+            return;
+        }
     
         socket.to(roomId).emit("ice_candidate", {
           senderId: senderId,
