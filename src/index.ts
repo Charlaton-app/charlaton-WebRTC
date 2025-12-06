@@ -232,10 +232,15 @@ io.on("connection",(socket) => {
     async function emitUsers(roomId: string) {
         const sockets = await io.in(roomId).fetchSockets();
         const users = sockets.map((s) => ({
-          userId: s.data.userId,
+          id: s.data.userId || s.data.user?.id,
+          userId: s.data.userId || s.data.user?.id,
           email: s.data.user?.email,
+          displayName: s.data.user?.displayName,
+          nickname: s.data.user?.nickname,
+          user: s.data.user,
         }));
     
+        console.log(`[EMIT_USERS] Emitting ${users.length} users for room ${roomId}`);
         io.to(roomId).emit("usersOnline", users);
     }
 
@@ -272,10 +277,26 @@ io.on("connection",(socket) => {
             }
     
             socket.join(roomId);
+            
+            console.log(`[ROOM] ✅ User ${user.email} joined WebRTC room ${roomId}`);
 
+            // Emit join success to the user first
             socket.emit("join_room_success", { user: socket.data.user, message: "estado WebRTC funcionando", success: true });
-            socket.to(roomId).emit("user_joined", user);
+            
+            // Notify others that this user joined
+            socket.to(roomId).emit("user_joined", {
+                id: userId,
+                userId: userId,
+                email: user.email,
+                displayName: user.displayName,
+                nickname: user.nickname,
+                user: socket.data.user
+            });
+            
+            // Send list of users to everyone (including the new user)
             await emitUsers(roomId);
+            
+            console.log(`[ROOM] 📡 Broadcasted user list for room ${roomId}`);
 
         } catch (error) {
             console.error("join_room error:", error);
@@ -287,75 +308,120 @@ io.on("connection",(socket) => {
 
     // ===== WebRTC SIGNALS =====
 
-    socket.on("webrtc_offer", async ({ senderId, sdp }) => {
-        const roomId = socket.data.roomId;
+    socket.on("webrtc_offer", async ({ roomId, targetUserId, sdp }) => {
+        const userRoomId = socket.data.roomId;
         
-        if (!roomId) {
-            socket.emit("webrtc_error", { message: "Not in any room", success: false });
+        if (!roomId || !targetUserId || !sdp) {
+            console.error("[OFFER] Missing parameters");
             return;
         }
 
-        const room = io.sockets.adapter.rooms.get(roomId);
-        if (!room) {
-            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+        if (userRoomId !== roomId) {
+            socket.emit("webrtc_error", { message: "Not in this room", success: false });
             return;
         }
-
-        socket.to(roomId).emit("webrtc_offer", {
-          senderId: senderId,
-          sdp,
-        });
+        
+        const userId = socket.data.userId || socket.data.user?.id;
+        console.log(`[OFFER] Forwarding offer from ${userId} to ${targetUserId}`);
+    
+        // Send to specific user
+        const sockets = await io.in(roomId).fetchSockets();
+        const targetSocket = sockets.find(s => 
+            (s.data.userId === targetUserId || s.data.user?.id === targetUserId) && s.id !== socket.id
+        );
+        
+        if (targetSocket) {
+            targetSocket.emit("webrtc_offer", {
+                senderId: userId,
+                sdp,
+            });
+        } else {
+            console.error(`[OFFER] Target user ${targetUserId} not found in room`);
+        }
     });
     
       // Cuando alguien envía una respuesta WebRTC
-    socket.on("webrtc_answer", async ({ senderId, sdp }) => {
-        const roomId = socket.data.roomId;
+    socket.on("webrtc_answer", async ({ roomId, targetUserId, sdp }) => {
+        const userRoomId = socket.data.roomId;
         
-        if (!roomId) {
-            socket.emit("webrtc_error", { message: "Not in any room", success: false });
+        if (!roomId || !targetUserId || !sdp) {
+            console.error("[ANSWER] Missing parameters");
             return;
         }
 
-        const room = io.sockets.adapter.rooms.get(roomId);
-        if (!room) {
-            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+        if (userRoomId !== roomId) {
+            socket.emit("webrtc_error", { message: "Not in this room", success: false });
             return;
         }
+        
+        const userId = socket.data.userId || socket.data.user?.id;
+        console.log(`[ANSWER] Forwarding answer from ${userId} to ${targetUserId}`);
     
-        socket.to(roomId).emit("webrtc_answer", {
-          senderId: senderId,
-          sdp,
-        });
+        // Send to specific user
+        const sockets = await io.in(roomId).fetchSockets();
+        const targetSocket = sockets.find(s => 
+            (s.data.userId === targetUserId || s.data.user?.id === targetUserId) && s.id !== socket.id
+        );
+        
+        if (targetSocket) {
+            targetSocket.emit("webrtc_answer", {
+                senderId: userId,
+                sdp,
+            });
+        } else {
+            console.error(`[ANSWER] Target user ${targetUserId} not found in room`);
+        }
     });
     
     
       // Cuando alguien envia sus ICE candidates
-    socket.on("webrtc_ice_candidate", async ({ senderId, candidate }) => {
-        const roomId = socket.data.roomId;
+    socket.on("webrtc_ice_candidate", async ({ roomId, targetUserId, candidate }) => {
+        const userRoomId = socket.data.roomId;
         
-        if (!roomId) {
-            socket.emit("webrtc_error", { message: "Not in any room", success: false });
+        if (!roomId || !targetUserId || !candidate) {
+            console.error("[ICE] Missing parameters");
             return;
         }
 
-        const room = io.sockets.adapter.rooms.get(roomId);
-        if (!room) {
-            socket.emit("webrtc_error", { message: "Room does not exist", success: false });
+        if (userRoomId !== roomId) {
+            socket.emit("webrtc_error", { message: "Not in this room", success: false });
             return;
         }
+        
+        const userId = socket.data.userId || socket.data.user?.id;
+        console.log(`[ICE] Forwarding ICE candidate from ${userId} to ${targetUserId}`);
     
-        socket.to(roomId).emit("ice_candidate", {
-          senderId: senderId,
-          candidate,
-        });
+        // Send to specific user
+        const sockets = await io.in(roomId).fetchSockets();
+        const targetSocket = sockets.find(s => 
+            (s.data.userId === targetUserId || s.data.user?.id === targetUserId) && s.id !== socket.id
+        );
+        
+        if (targetSocket) {
+            targetSocket.emit("webrtc_ice_candidate", {
+                senderId: userId,
+                candidate,
+            });
+        }
     });
 
     // ========== DISCONNECT ==========
     socket.on("disconnect", async () => {
         const roomId = socket.data.roomId;
         if (roomId) {
-        socket.to(roomId).emit("user_left", user);
-        await emitUsers(roomId);
+            const userId = socket.data.userId || user.id;
+            console.log(`[DISCONNECT] User ${user.email} (${userId}) left room ${roomId}`);
+            
+            socket.to(roomId).emit("user_left", {
+                id: userId,
+                userId: userId,
+                email: user.email,
+                displayName: user.displayName,
+                nickname: user.nickname,
+                user: socket.data.user
+            });
+            
+            await emitUsers(roomId);
         }
     });
 
