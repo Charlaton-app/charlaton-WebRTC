@@ -63,6 +63,8 @@ const getAllowedOrigins = (): string[] => {
     // Always allow localhost in development
     if (process.env.NODE_ENV !== "production") {
       origins.push("http://localhost:5173", "http://localhost:3000");
+      // Allow local network access
+      origins.push("http://192.168.20.123:5173");
     }
   
     return origins;
@@ -232,8 +234,8 @@ io.on("connection",(socket) => {
     async function emitUsers(roomId: string) {
         const sockets = await io.in(roomId).fetchSockets();
         const users = sockets.map((s) => ({
-          id: s.data.userId || s.data.user?.id,
-          userId: s.data.userId || s.data.user?.id,
+          id: s.data.user?.id,
+          userId: s.data.user?.id,
           email: s.data.user?.email,
           displayName: s.data.user?.displayName,
           nickname: s.data.user?.nickname,
@@ -268,8 +270,12 @@ io.on("connection",(socket) => {
                 return;
             }
     
-            const userId = socket.data.userId || user.id;
+            // CRITICAL: Always use user.id (Firebase UID) for consistency across Chat and WebRTC
+            // This ensures media state events from Chat socket match WebRTC peer connections
+            const userId = user.id;
             socket.data.roomId = roomId;
+            
+            console.log(`[ROOM] Using userId: ${userId} for WebRTC signaling`);
     
             if (!success){
                 socket.emit("join_room_error", {success: false, message: "invalid", user: socket.data.user});
@@ -278,7 +284,7 @@ io.on("connection",(socket) => {
     
             socket.join(roomId);
             
-            console.log(`[ROOM] ✅ User ${user.email} joined WebRTC room ${roomId}`);
+            console.log(`[ROOM] ✅ User ${user.email} (${userId}) joined WebRTC room ${roomId}`);
 
             // Emit join success to the user first
             socket.emit("join_room_success", { user: socket.data.user, message: "estado WebRTC funcionando", success: true });
@@ -321,7 +327,8 @@ io.on("connection",(socket) => {
             return;
         }
         
-        const userId = socket.data.userId || socket.data.user?.id;
+        // Always use user.id (Firebase UID) for consistency with Chat socket
+        const userId = user.id;
         console.log(`[OFFER] Forwarding offer from ${userId} to ${targetUserId}`);
     
         // Send to specific user
@@ -354,7 +361,8 @@ io.on("connection",(socket) => {
             return;
         }
         
-        const userId = socket.data.userId || socket.data.user?.id;
+        // Always use user.id (Firebase UID) for consistency with Chat socket
+        const userId = user.id;
         console.log(`[ANSWER] Forwarding answer from ${userId} to ${targetUserId}`);
     
         // Send to specific user
@@ -388,7 +396,8 @@ io.on("connection",(socket) => {
             return;
         }
         
-        const userId = socket.data.userId || socket.data.user?.id;
+        // Always use user.id (Firebase UID) for consistency with Chat socket
+        const userId = user.id;
         console.log(`[ICE] Forwarding ICE candidate from ${userId} to ${targetUserId}`);
     
         // Send to specific user
@@ -409,7 +418,8 @@ io.on("connection",(socket) => {
     socket.on("disconnect", async () => {
         const roomId = socket.data.roomId;
         if (roomId) {
-            const userId = socket.data.userId || user.id;
+            // Always use user.id (Firebase UID) for consistency with Chat socket
+            const userId = user.id;
             console.log(`[DISCONNECT] User ${user.email} (${userId}) left room ${roomId}`);
             
             socket.to(roomId).emit("user_left", {
@@ -429,9 +439,10 @@ io.on("connection",(socket) => {
 });
 
 // ===== Start Server =====
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
     console.log("=".repeat(70));
     console.log(`[SERVER] 🚀 Charlaton WebRTC Microservice running on port ${PORT}`);
+    console.log(`[SERVER] 📱 Accessible on local network at http://192.168.20.123:${PORT}`);
     console.log(`[CORS] 🌐 Allowed origins: ${allowedOrigins.join(", ")}`);
     console.log(`[FIREBASE] 🔥 Admin SDK initialized`);
     console.log(`[AUTH] 🔐 JWT authentication enabled`);
