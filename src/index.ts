@@ -263,6 +263,39 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("usersOnline", users);
   }
 
+  /**
+   * Helper function to ensure socket is in a room
+   * If not, tries to join automatically
+   */
+  async function ensureInRoom(socket: any, roomId: string): Promise<boolean> {
+    if (socket.data.roomId === roomId) {
+      return true; // Already in room
+    }
+
+    console.log(`[AUTO-JOIN] Socket ${socket.id} not in room ${roomId}, attempting auto-join`);
+
+    try {
+      // Verify room exists
+      const roomQuery = await db.collection("rooms").doc(roomId).get();
+      if (!roomQuery.exists) {
+        console.error(`[AUTO-JOIN] Room ${roomId} does not exist`);
+        return false;
+      }
+
+      // Join the room
+      socket.data.roomId = roomId;
+      socket.join(roomId);
+      
+      const userId = user.id;
+      console.log(`[AUTO-JOIN] ✅ User ${userId} auto-joined room ${roomId}`);
+      
+      return true;
+    } catch (error) {
+      console.error(`[AUTO-JOIN] Failed to join room ${roomId}:`, error);
+      return false;
+    }
+  }
+
   // ===== JOIN ROOM EVENT =====
 
   socket.on("join_room", async ({ roomId, success }) => {
@@ -296,6 +329,7 @@ io.on("connection", (socket) => {
       const userId = user.id;
       socket.data.roomId = roomId;
 
+      console.log(`[ROOM] 💾 Setting socket.data.roomId = ${roomId} for user ${userId} (socketId: ${socket.id})`);
       console.log(`[ROOM] Using userId: ${userId} for WebRTC signaling`);
 
       if (!success) {
@@ -355,12 +389,18 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Try to auto-join if not in room
     if (userRoomId !== roomId) {
-      socket.emit("webrtc_error", {
-        message: "Not in this room",
-        success: false,
-      });
-      return;
+      console.warn(`[OFFER] ⚠️  Socket not in room, attempting auto-join`);
+      const joined = await ensureInRoom(socket, roomId);
+      if (!joined) {
+        console.error(`[OFFER] ❌ Room mismatch - socket.data.roomId: ${userRoomId}, requested roomId: ${roomId}, userId: ${user.id}`);
+        socket.emit("webrtc_error", {
+          message: "Not in this room",
+          success: false,
+        });
+        return;
+      }
     }
 
     // Always use user.id (Firebase UID) for consistency with Chat socket
@@ -394,12 +434,18 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Try to auto-join if not in room
     if (userRoomId !== roomId) {
-      socket.emit("webrtc_error", {
-        message: "Not in this room",
-        success: false,
-      });
-      return;
+      console.warn(`[ANSWER] ⚠️  Socket not in room, attempting auto-join`);
+      const joined = await ensureInRoom(socket, roomId);
+      if (!joined) {
+        console.error(`[ANSWER] ❌ Room mismatch - socket.data.roomId: ${userRoomId}, requested roomId: ${roomId}, userId: ${user.id}`);
+        socket.emit("webrtc_error", {
+          message: "Not in this room",
+          success: false,
+        });
+        return;
+      }
     }
 
     // Always use user.id (Firebase UID) for consistency with Chat socket
@@ -435,12 +481,18 @@ io.on("connection", (socket) => {
         return;
       }
 
+      // Try to auto-join if not in room
       if (userRoomId !== roomId) {
-        socket.emit("webrtc_error", {
-          message: "Not in this room",
-          success: false,
-        });
-        return;
+        console.warn(`[ICE] ⚠️  Socket not in room, attempting auto-join`);
+        const joined = await ensureInRoom(socket, roomId);
+        if (!joined) {
+          console.error(`[ICE] ❌ Room mismatch - socket.data.roomId: ${userRoomId}, requested roomId: ${roomId}, userId: ${user.id}, socketId: ${socket.id}`);
+          socket.emit("webrtc_error", {
+            message: "Not in this room",
+            success: false,
+          });
+          return;
+        }
       }
 
       // Always use user.id (Firebase UID) for consistency with Chat socket
