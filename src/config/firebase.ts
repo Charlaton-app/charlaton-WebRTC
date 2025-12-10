@@ -43,9 +43,15 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   );
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Check if Firebase is already initialized to avoid duplicate initialization errors
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("[FIREBASE] ✅ Firebase Admin initialized successfully");
+} else {
+  console.log("[FIREBASE] ℹ️ Using existing Firebase Admin instance");
+}
 
 /**
  * Firestore database instance.
